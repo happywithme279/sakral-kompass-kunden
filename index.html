@@ -177,9 +177,9 @@ document.querySelectorAll("#tabs button").forEach(b=>b.setAttribute("aria-select
 for(let k=0;k<7;k++)$("p"+k).hidden=k!=i;if(i==5)sum();info()};
 const clean=t=>t.replace(/\bZug(es|s)\b/g,"Impulses").replace(/\bZug\b/g,"Impuls");
 const DONE={};
-async function ask(btn,out,prompt){
+async function ask(btn,out,prompt,o){o=o||{};const pre=o.pre||"",last=o.last!==false;let keep=false;
 if(MODE=="kunden"&&DONE[out.id])return false;
-out.className="out on";out.textContent="Einen Moment, ich spüre für dich hinein …";btn.disabled=true;
+out.className="out on";out.textContent=pre?pre+"…":"Einen Moment, ich spüre für dich hinein …";btn.disabled=true;
 try{
 let r;
 for(let a=0;a<2;a++){
@@ -190,11 +190,15 @@ const c=window.prompt("Zugangscode");if(!c)break;sessionStorage.setItem("kc",c);
 if(r.status===401)throw new Error("401");
 if(!r.ok||!r.body)throw new Error(String(r.status));
 const rd=r.body.getReader(),dc=new TextDecoder();let t="";
-for(;;){const x=await rd.read();if(x.done)break;t+=dc.decode(x.value,{stream:true});const c=clean(t);out.textContent=c;R[out.id]=c}
+for(;;){const x=await rd.read();if(x.done)break;t+=dc.decode(x.value,{stream:true});const c=pre+clean(t);out.textContent=c;R[out.id]=c}
 if(!t.trim())throw new Error("leer");
-DONE[out.id]=1;save();return true;
+if(last){DONE[out.id]=1;save()}keep=!last;return true;
 }catch(e){delete R[out.id];out.textContent=e&&e.message==="401"?"Der Zugangscode stimmt nicht.":"Das hat leider nicht geklappt. Versuch es bitte noch einmal."}
-finally{const lk=MODE=="kunden"&&DONE[out.id];btn.disabled=!!lk;if(lk)btn.textContent="Analyse erstellt"}}
+finally{const lk=MODE=="kunden"&&DONE[out.id];btn.disabled=!!lk||keep;if(lk)btn.textContent="Analyse erstellt"}}
+async function askPortrait(btn,out,p1,p2f){
+if(!await ask(btn,out,p1,{last:false}))return;
+await ask(btn,out,p2f(R[out.id]),{pre:R[out.id]+"\n\n",last:true});
+}
 function need(v,out){if(v.trim().length<3){out.className="out on";out.textContent="Schreib mir bitte ein paar Worte dazu, dann kann ich dir persönlich antworten.";return false}return true}
 $("b0").onclick=()=>{const v=$("a0").value;if(!need(v,$("o0")))return;H.o0="Alltagssituation: "+v;
 ask($("b0"),$("o0"),"Aufgabe: Zeige, wie diese Generatorin ihre Strategie in genau dieser Alltagssituation umsetzt. Gib die Schritte, die wirklich nötig sind, und einen Beispielsatz, den sie sagen kann.\nSituation: "+v)};
@@ -273,7 +277,10 @@ if(n)parts.push("Ja/Nein-Übung zum Sakral: "+Q.map((q,i)=>YN[i]?q+" "+YN[i]:"")
 const xs=EX.map((e,i)=>EXV[i]!=null?e[0]+" "+EXV[i]+" von 10":"").filter(Boolean);
 if(xs.length)parts.push("Einschätzung der Körperübungen von 0 (nichts für mich) bis 10 (genau meins): "+xs.join(", "));
 if(!parts.length){o.className="out on";o.textContent="Probier zuerst ein paar Reiter aus, dann schreibe ich dir ein Porträt, das wirklich zu dir passt.";return}
-ask($("bP"),o,"Aufgabe: Schreibe ein ausführliches persönliches Porträt dieser Generatorin, in Du-Form, 900 bis 1200 Wörter. Sie soll beim Lesen denken: ja, das bin ich. Beschreibe, wie sich ihr Funktionieren im Alltag anfühlt, was sie bisher getan hat, um es allen recht zu machen, und was in ihr nach etwas anderem ruft. Stütze dich auf ihre eigenen Worte, ihre Placements und Tore und beschreibe Muster, die bei Generatorinnen mit diesen Placements typisch sind. Unterstelle ihr keine konkreten Lebensereignisse, die sie nicht genannt hat. Gib danach konkrete Impulse für ihren Alltag, damit sie das Funktionieren stoppt, sich selbst in den Mittelpunkt ihres Lebens stellt und ihr Happy Life 2.0 gestaltet. Jeder Impuls enthält eine kleine Alltagssituation und einen Schritt, in der Anzahl, die inhaltlich stimmt. Verbinde die Impulse mit ihren Ergebnissen und ihrem Sakral-Ja und Nein. Schreibe zum Schluss einen eigenen, ausführlichen Abschnitt über ihr Happy Life 2.0 (etwa 300 bis 400 Wörter, ohne Überschrift, mit einem Übergangssatz am Anfang). Analysiere dafür alle Punkte zusammen: ihre Bedürfnisse und ihren Mond, ihre Grundenergie aus den Elementen und dem Antriebsstil ihrer Planeten, ihre Freude und Venus, ihre Lebensaufgabe aus den Toren, die Wachstumsrichtung ihrer Mondknoten, ihre Sakral-Antworten und ihre eigenen Worte. Zeige, wie ihr Alltag in diesem Leben aussieht: wie sie ihre Tage und Wochen gestaltet, was sie tut und lässt, wie sie mit anderen Menschen umgeht, wie sich ihr Körper anfühlt und woran sie merkt, dass sie angekommen ist. Verwende nur Punkte, zu denen sie Angaben gemacht hat. Ende mit einer konkreten Aussage über ihr Happy Life 2.0.\n\nIhre Angaben und Ergebnisse:\n"+parts.join("\n\n"))};
+const D="\n\nIhre Angaben und Ergebnisse:\n"+parts.join("\n\n");
+const P1="Aufgabe, Teil 1 von 2: Schreibe ein persönliches Porträt dieser Generatorin in Du-Form, etwa 600 bis 750 Wörter. Sie soll beim Lesen denken: ja, das bin ich. Beschreibe, wie sich ihr Funktionieren im Alltag anfühlt, was sie bisher getan hat, um es allen recht zu machen, und was in ihr nach etwas anderem ruft. Stütze dich auf ihre eigenen Worte, ihre Placements und Tore und beschreibe Muster, die bei Generatorinnen mit diesen Placements typisch sind. Unterstelle ihr keine konkreten Lebensereignisse, die sie nicht genannt hat. Gib danach konkrete Impulse für ihren Alltag, damit sie das Funktionieren stoppt, sich selbst in den Mittelpunkt ihres Lebens stellt und ihr Happy Life 2.0 gestaltet. Jeder Impuls enthält eine kleine Alltagssituation und einen Schritt, in der Anzahl, die inhaltlich stimmt. Verbinde die Impulse mit ihren Ergebnissen und ihrem Sakral-Ja und Nein. Der Abschnitt über ihr Happy Life 2.0 folgt in Teil 2, schreibe ihn hier noch nicht. Länge: höchstens 800 Wörter."+D;
+const P2=a=>"Aufgabe, Teil 2 von 2: Der folgende Text ist der erste Teil des Porträts. Schreibe nun den abschließenden, ausführlichen Abschnitt über ihr Happy Life 2.0 (etwa 350 bis 450 Wörter, ohne Überschrift, mit einem Übergangssatz am Anfang, ohne den ersten Teil zu wiederholen). Analysiere dafür alle Punkte zusammen: ihre Bedürfnisse und ihren Mond, ihre Grundenergie aus den Elementen und dem Antriebsstil ihrer Planeten, ihre Freude und Venus, ihre Lebensaufgabe aus den Toren, die Wachstumsrichtung ihrer Mondknoten, ihre Sakral-Antworten und ihre eigenen Worte. Zeige, wie ihr Alltag in diesem Leben aussieht: wie sie ihre Tage und Wochen gestaltet, was sie tut und lässt, wie sie mit anderen Menschen umgeht, wie sich ihr Körper anfühlt und woran sie merkt, dass sie angekommen ist. Verwende nur Punkte, zu denen sie Angaben gemacht hat. Ende mit einer konkreten Aussage über ihr Happy Life 2.0. Länge: höchstens 450 Wörter.\n\nBisheriger Text:\n"+a+D;
+askPortrait($("bP"),o,P1,P2)};
 $("save").onclick=img;
 const MOD={Widder:0,Krebs:0,Waage:0,Steinbock:0,Stier:1,Löwe:1,Skorpion:1,Wassermann:1,Zwillinge:2,Jungfrau:2,Schütze:2,Fische:2};
 const EL={Widder:0,Löwe:0,Schütze:0,Stier:1,Jungfrau:1,Steinbock:1,Zwillinge:2,Waage:2,Wassermann:2,Krebs:3,Skorpion:3,Fische:3};
