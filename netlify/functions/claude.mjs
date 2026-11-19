@@ -35,7 +35,7 @@ export default async (req) => {
     },
     body: JSON.stringify({
       model: process.env.CLAUDE_MODEL || "claude-sonnet-5-5",
-      max_tokens: Number(process.env.MAX_TOKENS) || 2500,
+      max_tokens: Number(process.env.MAX_TOKENS) || 700,
       stream: true,
       system: SYSTEM,
       messages: [{ role: "user", content: prompt }],
@@ -50,6 +50,7 @@ export default async (req) => {
     async start(ctrl) {
       const rd = up.body.getReader();
       let buf = "";
+      let stop = "";
       try {
         for (;;) {
           const { done, value } = await rd.read();
@@ -64,6 +65,7 @@ export default async (req) => {
             if (!j || j === "[DONE]") continue;
             try {
               const ev = JSON.parse(j);
+              if (ev.type === "message_delta" && ev.delta && ev.delta.stop_reason) stop = ev.delta.stop_reason;
               if (ev.type === "content_block_delta" && ev.delta && ev.delta.type === "text_delta") {
                 ctrl.enqueue(enc.encode(ev.delta.text));
               }
@@ -71,6 +73,8 @@ export default async (req) => {
           }
         }
       } catch {}
+      // Endmarkierung: nur wenn die KI den Text wirklich beendet hat
+      if (stop === "end_turn") ctrl.enqueue(enc.encode("\u0003"));
       ctrl.close();
     },
   });
