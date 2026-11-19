@@ -185,10 +185,11 @@ if(r.status!==401)break;
 const c=window.prompt("Zugangscode");if(!c)break;sessionStorage.setItem("kc",c);
 }
 if(r.status===401)throw new Error("401");
-if(!r.ok||!r.body)throw new Error(String(r.status));
-const rd=r.body.getReader(),dc=new TextDecoder();let t="";
-try{for(;;){const x=await rd.read();if(x.done)break;t+=dc.decode(x.value,{stream:true});onT(t)}}catch(e){}
-return t;
+if(!r.ok||!r.body){const m=(await r.text().catch(()=>"")).slice(0,200);throw new Error(r.status+(m?" "+m:""))}
+const v2=r.headers.get("x-sk")==="2";
+const rd=r.body.getReader(),dc=new TextDecoder();let t="",okEnd=true;
+try{for(;;){const x=await rd.read();if(x.done)break;t+=dc.decode(x.value,{stream:true});onT(t)}}catch(e){okEnd=false}
+return {t,v2,okEnd};
 }
 function cut(s){s=s.trimEnd();if(/[.!?]["“”)]?$/.test(s))return s;const i=Math.max(s.lastIndexOf(". "),s.lastIndexOf("! "),s.lastIndexOf("? "),s.lastIndexOf("\n"));return i>0?s.slice(0,i+1).trimEnd():s}
 async function ask(btn,out,prompt,o){
@@ -200,8 +201,8 @@ try{
 let acc="",fin=false,empty=0;
 for(let n=0;n<8&&!fin;n++){
 const p=n?prompt+"\n\nBisher geschriebener Text. Schreibe genau an dieser Stelle weiter, ohne Wiederholung und ohne Einleitung. Ist der Text schon vollständig, antworte nur mit einem Punkt.\n\n"+acc:prompt;
-const t=await pull(p,x=>show((acc?acc+" ":"")+x.replace("\u0003","")));
-fin=t.includes("\u0003");
+const q=await pull(p,x=>show((acc?acc+" ":"")+x.replace("\u0003","")));const t=q.t;
+fin=t.includes("\u0003")||(!q.v2&&q.okEnd);
 let add=t.replace("\u0003","").trim();
 if(n&&add==="."){fin=true;add=""}
 if(!add){if(fin)break;if(++empty>=3)break;continue}
@@ -212,7 +213,7 @@ show(acc);
 if(!acc.trim())throw new Error("leer");
 show(acc);
 if(last){DONE[out.id]=1;save()}keep=!last;return true;
-}catch(e){delete R[out.id];out.textContent=e&&e.message==="401"?"Der Zugangscode stimmt nicht.":"Das hat leider nicht geklappt. Versuch es bitte noch einmal."}
+}catch(e){delete R[out.id];out.textContent=e&&e.message==="401"?"Der Zugangscode stimmt nicht.":"Das hat leider nicht geklappt. Versuch es bitte noch einmal."+(e&&e.message&&e.message!=="leer"?"\n\nTechnischer Hinweis: "+e.message:"")}
 finally{const lk=MODE=="kunden"&&DONE[out.id];btn.disabled=!!lk||keep;if(lk)btn.textContent="Analyse erstellt"}}
 async function askPortrait(btn,out,p1,p2f){
 if(!await ask(btn,out,p1,{last:false}))return;
