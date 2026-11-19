@@ -177,10 +177,7 @@ document.querySelectorAll("#tabs button").forEach(b=>b.setAttribute("aria-select
 for(let k=0;k<7;k++)$("p"+k).hidden=k!=i;if(i==5)sum();info()};
 const clean=t=>t.replace(/\bZug(es|s)\b/g,"Impulses").replace(/\bZug\b/g,"Impuls");
 const DONE={};
-async function ask(btn,out,prompt,o){o=o||{};const pre=o.pre||"",last=o.last!==false;let keep=false;
-if(MODE=="kunden"&&DONE[out.id])return false;
-out.className="out on";out.textContent=pre?pre+"…":"Einen Moment, ich spüre für dich hinein …";btn.disabled=true;
-try{
+async function pull(prompt,onT){
 let r;
 for(let a=0;a<2;a++){
 r=await fetch(API,{method:"POST",headers:{"Content-Type":"application/json","x-access-code":sessionStorage.getItem("kc")||""},body:JSON.stringify({prompt})});
@@ -190,8 +187,30 @@ const c=window.prompt("Zugangscode");if(!c)break;sessionStorage.setItem("kc",c);
 if(r.status===401)throw new Error("401");
 if(!r.ok||!r.body)throw new Error(String(r.status));
 const rd=r.body.getReader(),dc=new TextDecoder();let t="";
-for(;;){const x=await rd.read();if(x.done)break;t+=dc.decode(x.value,{stream:true});const c=pre+clean(t);out.textContent=c;R[out.id]=c}
-if(!t.trim())throw new Error("leer");
+try{for(;;){const x=await rd.read();if(x.done)break;t+=dc.decode(x.value,{stream:true});onT(t)}}catch(e){}
+return t;
+}
+function cut(s){s=s.trimEnd();if(/[.!?]["“”)]?$/.test(s))return s;const i=Math.max(s.lastIndexOf(". "),s.lastIndexOf("! "),s.lastIndexOf("? "),s.lastIndexOf("\n"));return i>0?s.slice(0,i+1).trimEnd():s}
+async function ask(btn,out,prompt,o){
+o=o||{};const pre=o.pre||"",last=o.last!==false;let keep=false;
+if(MODE=="kunden"&&DONE[out.id])return false;
+out.className="out on";out.textContent=pre?pre+"…":"Einen Moment, ich spüre für dich hinein …";btn.disabled=true;
+const show=s=>{const c=pre+clean(s);out.textContent=c;R[out.id]=c};
+try{
+let acc="",fin=false,empty=0;
+for(let n=0;n<8&&!fin;n++){
+const p=n?prompt+"\n\nBisher geschriebener Text. Schreibe genau an dieser Stelle weiter, ohne Wiederholung und ohne Einleitung. Ist der Text schon vollständig, antworte nur mit einem Punkt.\n\n"+acc:prompt;
+const t=await pull(p,x=>show((acc?acc+" ":"")+x.replace("\u0003","")));
+fin=t.includes("\u0003");
+let add=t.replace("\u0003","").trim();
+if(n&&add==="."){fin=true;add=""}
+if(!add){if(fin)break;if(++empty>=3)break;continue}
+const j=acc?acc+(acc.endsWith("\n")?"":" ")+add:add;
+acc=fin?j:cut(j);
+show(acc);
+}
+if(!acc.trim())throw new Error("leer");
+show(acc);
 if(last){DONE[out.id]=1;save()}keep=!last;return true;
 }catch(e){delete R[out.id];out.textContent=e&&e.message==="401"?"Der Zugangscode stimmt nicht.":"Das hat leider nicht geklappt. Versuch es bitte noch einmal."}
 finally{const lk=MODE=="kunden"&&DONE[out.id];btn.disabled=!!lk||keep;if(lk)btn.textContent="Analyse erstellt"}}
