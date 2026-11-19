@@ -26,7 +26,9 @@ export default async (req) => {
   const key = process.env.ANTHROPIC_API_KEY;
   if (!key) return new Response("Server nicht konfiguriert", { status: 500 });
 
-  const up = await fetch("https://api.anthropic.com/v1/messages", {
+  let up;
+  try {
+    up = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
     headers: {
       "content-type": "application/json",
@@ -41,7 +43,13 @@ export default async (req) => {
       messages: [{ role: "user", content: prompt }],
     }),
   });
-  if (!up.ok || !up.body) return new Response("Upstream error", { status: 502 });
+  } catch (e) {
+    return new Response("Verbindung zu Anthropic fehlgeschlagen: " + e.message, { status: 502 });
+  }
+  if (!up.ok || !up.body) {
+    const m = await up.text().catch(() => "");
+    return new Response("Anthropic " + up.status + ": " + m.slice(0, 300), { status: 502 });
+  }
 
   // Streamt nur den reinen Text an den Browser
   const enc = new TextEncoder();
@@ -79,6 +87,6 @@ export default async (req) => {
     },
   });
   return new Response(stream, {
-    headers: { "content-type": "text/plain; charset=utf-8", "cache-control": "no-store" },
+    headers: { "content-type": "text/plain; charset=utf-8", "cache-control": "no-store", "x-sk": "2" },
   });
 };
