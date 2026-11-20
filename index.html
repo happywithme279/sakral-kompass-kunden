@@ -144,7 +144,7 @@ footer a{color:var(--deep);font-weight:700}
 
 <footer>
 <p class="script">Sakral trifft Seele</p>
-<p class="hint" style="font-size:12px;margin:0 0 6px">Version 4</p>
+<p class="hint" style="font-size:12px;margin:0 0 6px">Version 5</p>
 <p>Mehr von mir: <a href="https://www.instagram.com/happy___with___me" target="_blank" rel="noopener">@happy___with___me</a> · <a href="https://alfima.com/kerstin_happywithme/p/shop" target="_blank" rel="noopener">Zum Shop</a></p>
 <p>Ein Impuls zur Selbstreflexion, kein Ersatz für ärztliche oder therapeutische Hilfe.</p>
 </footer>
@@ -184,16 +184,17 @@ const clean=t=>t.replace(/\bZug(es|s)\b/g,"Impulses").replace(/\bZug\b/g,"Impuls
 const DONE={};
 async function pull(prompt,onT){
 let r;
-for(let a=0;a<2;a++){
+for(let a=0;a<3;a++){
 r=await fetch(API,{method:"POST",headers:{"Content-Type":"application/json","x-access-code":sessionStorage.getItem("kc")||""},body:JSON.stringify({prompt})});
-if(r.status!==401)break;
-const c=window.prompt("Zugangscode");if(!c)break;sessionStorage.setItem("kc",c);
+if(r.status===401){const c=window.prompt("Zugangscode");if(!c)break;sessionStorage.setItem("kc",c);continue}
+if([502,503,504].includes(r.status)&&a<2){await new Promise(z=>setTimeout(z,1500));continue}
+break;
 }
 if(r.status===401)throw new Error("401");
 if(!r.ok||!r.body){let m=(await r.text().catch(()=>"")).trim().slice(0,200);if(m.startsWith("<"))m="";throw new Error(r.status===404?"404 Die KI-Funktion wurde nicht gefunden. Öffne das Tool über deine Netlify-Adresse, nicht in einer Vorschau.":r.status+(m?" "+m:""))}
 const v2=r.headers.get("x-sk")==="2";
 const rd=r.body.getReader(),dc=new TextDecoder();let t="",okEnd=true;
-try{for(;;){const x=await rd.read();if(x.done)break;t+=dc.decode(x.value,{stream:true});onT(t)}}catch(e){okEnd=false}
+try{for(;;){const x=await rd.read();if(x.done)break;const pc=dc.decode(x.value,{stream:true}).replace(/\u0002/g,"");if(!pc)continue;t+=pc;onT(t)}}catch(e){okEnd=false}
 return {t,v2,okEnd};
 }
 function cut(s){s=s.trimEnd();if(/[.!?]["“”)]?$/.test(s))return s;const i=Math.max(s.lastIndexOf(". "),s.lastIndexOf("! "),s.lastIndexOf("? "),s.lastIndexOf("\n"));return i>0?s.slice(0,i+1).trimEnd():s}
@@ -307,7 +308,7 @@ m.textContent="Dein Bild wurde heruntergeladen. Öffnet es sich stattdessen, hal
 }catch(e){m.textContent=e&&e.code=="declined"?"Speichern abgebrochen.":"Das Speichern hat nicht geklappt. Mach bitte einen Screenshot."}}
 function SS(){return SUM.concat(R.oP?[["Dein persönliches Porträt",R.oP]]:[])}
 $("bP").onclick=()=>{
-const o=$("oP"),parts=["o0","o6","o1","o2","o3"].filter(k=>R[k]).map(k=>H[k]+"\nErgebnis:\n"+R[k]);
+const o=$("oP"),parts=["o0","o6","o1","o2","o3"].filter(k=>R[k]).map(k=>H[k]+"\nErgebnis:\n"+R[k].slice(0,1500));
 const n=YN.filter(Boolean).length;
 if(n)parts.push("Ja/Nein-Übung zum Sakral: "+Q.map((q,i)=>YN[i]?q+" "+YN[i]:"").filter(Boolean).join(" | "));
 const xs=EX.map((e,i)=>EXV[i]!=null?e[0]+" "+EXV[i]+" von 10":"").filter(Boolean);
