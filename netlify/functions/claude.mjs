@@ -4,6 +4,64 @@ const SYSTEM = `Du bist der Sakral-Kompass, ein warmer, klarer Begleiter von Ker
 
 export default async (req) => {
   // Selbsttest: Adresse mit ?check=1 im Browser öffnen
+  if (req.method === "GET" && new URL(req.url).searchParams.get("check") === "stream") {
+    const k = (process.env.ANTHROPIC_API_KEY || "").trim();
+    const model = process.env.CLAUDE_MODEL || "claude-sonnet-5-5";
+    const out = [];
+    const t0 = Date.now();
+    try {
+      const r = await fetch("https://api.anthropic.com/v1/messages", {
+        method: "POST",
+        headers: { "content-type": "application/json", "x-api-key": k, "anthropic-version": "2023-06-01" },
+        body: JSON.stringify({
+          model,
+          max_tokens: Number(process.env.MAX_TOKENS) || 4000,
+          stream: true,
+          system: SYSTEM,
+          messages: [{ role: "user", content: "Aufgabe: Schreibe in etwa 60 Wörtern, was das Sakral für eine Generatorin bedeutet." }],
+        }),
+      });
+      out.push("Status: " + r.status);
+      if (!r.ok) {
+        out.push((await r.text()).slice(0, 500));
+      } else {
+        const rd = r.body.getReader();
+        const dc = new TextDecoder();
+        let buf = "", text = "", first = 0, stop = "";
+        const kinds = {};
+        for (;;) {
+          const { done, value } = await rd.read();
+          if (done) break;
+          buf += dc.decode(value, { stream: true });
+          let i;
+          while ((i = buf.indexOf("\n")) >= 0) {
+            const line = buf.slice(0, i).trim();
+            buf = buf.slice(i + 1);
+            if (!line.startsWith("data:")) continue;
+            try {
+              const ev = JSON.parse(line.slice(5).trim());
+              const kind = ev.type + (ev.delta && ev.delta.type ? "/" + ev.delta.type : "");
+              kinds[kind] = (kinds[kind] || 0) + 1;
+              if (ev.type === "content_block_delta" && ev.delta && ev.delta.type === "text_delta") {
+                if (!first) first = Date.now() - t0;
+                text += ev.delta.text;
+              }
+              if (ev.type === "message_delta" && ev.delta && ev.delta.stop_reason) stop = ev.delta.stop_reason;
+            } catch {}
+          }
+        }
+        out.push("Ereignisse: " + JSON.stringify(kinds));
+        out.push("Erster Text nach: " + first + " ms");
+        out.push("Ende: " + stop);
+        out.push("Textlänge: " + text.length);
+        out.push("Anfang des Textes: " + text.slice(0, 300));
+      }
+    } catch (e) {
+      out.push("Fehler: " + e.message);
+    }
+    out.push("Gesamtdauer: " + (Date.now() - t0) + " ms");
+    return new Response(out.join("\n"), { headers: { "content-type": "text/plain; charset=utf-8" } });
+  }
   if (req.method === "GET" && new URL(req.url).searchParams.has("check")) {
     const k = (process.env.ANTHROPIC_API_KEY || "").trim();
     const model = process.env.CLAUDE_MODEL || "claude-sonnet-5-5";
@@ -57,7 +115,7 @@ export default async (req) => {
     },
     body: JSON.stringify({
       model: process.env.CLAUDE_MODEL || "claude-sonnet-5-5",
-      max_tokens: Number(process.env.MAX_TOKENS) || 700,
+      max_tokens: Number(process.env.MAX_TOKENS) || 4000,
       stream: true,
       system: SYSTEM,
       messages: [{ role: "user", content: prompt }],
